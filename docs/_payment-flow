@@ -1,0 +1,295 @@
+# Payment Flow Documentation
+
+## Overview
+
+This document describes the payment processing flow for the game launcher platform, focusing on the SePay integration with idempotency mechanisms and simplified webhook authentication.
+
+## Key Features
+
+- **Idempotency**: Each transaction is processed exactly once using `sepay_id`
+- **Atomic Operations**: MongoDB transactions ensure data consistency
+- **Simplified Authentication**: Bearer token + IP whitelist + timestamp validation
+- **Concurrent Processing**: Race condition protection through transaction reservation
+
+## Authentication Flow
+
+### Webhook Authentication
+
+SePay webhooks are authenticated using a three-layer approach:
+
+1. **IP Whitelist Validation**
+   - Configurable via `SEPAY_IP_WHITELIST` environment variable
+   - Format: `127.0.0.1,::1,103.74.123.0/24`
+   - Skipped in development mode
+
+2. **Timestamp Validation**
+   - Prevents replay attacks
+   - Timestamp window: `SEPAY_TIMESTAMP_WINDOW` (default: 300 seconds)
+   - Timestamp can be in header `x-sepay-timestamp` or body `timestamp` field
+
+3. **Bearer Token Authentication**
+   - Format: `Authorization: Bearer <SEPAY_API_KEY>`
+   - Replaces the previous `Apikey` format and signature verification
+
+### Environment Variables
+
+```bash
+# Required
+SEPAY_API_KEY=your-api-key
+SEPAY_ACCOUNT_NO=your-account-number
+
+# Optional
+SEPAY_IP_WHITELIST=127.0.0.1,::1,103.74.123.0/24
+SEPAY_TIMESTAMP_WINDOW=300
+
+```
+
+## Idempotency Mechanism
+
+### Transaction Reservation
+
+1. **Duplicate Check**: Query for existing transaction with same `sepay_id`
+2. **Immediate Reservation**: Create transaction with `status: 'processing'`
+3. **Atomic Processing**: Update reserved transaction within MongoDB session
+4. **Race Condition Protection**: First webhook wins, others return duplicate response
+
+### Transaction States
+
+- `pending`: Initial state for user-initiated transactions
+- `processing`: Reserved state during webhook processing
+- `completed`: Successfully processed transaction
+- `failed`: Transaction processing failed
+- `cancelled`: Transaction was cancelled
+
+## Payment Flows
+
+### Flow 1: Username-based Points Top-up
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Bank
+    participant SePay
+    participant Backend
+    participant MongoDB
+
+    User->>Bank: Transfer with username in content
+    Bank->>SePay: Transaction notification
+    SePay->>Backend: POST /api/v1/payments/webhook
+    
+    Backend->>Backend: Validate IP + Timestamp + Bearer token
+    Backend->>MongoDB: Check duplicate by sepay_id
+    
+    alt No duplicate found
+        Backend->>MongoDB: Reserve transaction (status: processing)
+        Backend->>Backend: Parse username from content
+        Backend->>MongoDB: Find user by username
+        Backend->>MongoDB: Update user balance + points (atomic)
+        Backend->>MongoDB: Complete transaction (status: completed)
+        Backend->>SePay: Return success: true
+    else Duplicate found
+        Backend->>SePay: Return success: true, duplicate: true
+    end
+```
+
+### Flow 2: Authenticated Balance Recharge
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant SePay
+    participant MongoDB
+
+    User->>Frontend: Request balance recharge
+    Frontend->>Backend: GET /api/v1/payments/transfer_content
+    Backend->>MongoDB: Create transaction (status: pending)
+    Backend->>Backend: Generate QR code info
+    Backend->>Frontend: Return QR data + reference_code
+    
+    User->>SePay: Pay via QR code
+    SePay->>Backend: POST /api/v1/payments/webhook
+    Backend->>Backend: Process via reference_code flow
+    Backend->>MongoDB: Update transaction + user balance
+    Backend->>SePay: Return success: true
+```
+
+## Code Implementation
+
+### Service Layer (sepay.service.js)
+
+#### Key Methods
+
+- `processPointsWebhook(payload, traceId)`: Main webhook processor with idempotency
+- `processWebhookContent(payload, traceId)`: Content processing after reservation
+- `parseUsernameFromContent(content)`: Extract username using regex
+- `convertVndToPoints(vndAmount)`: Convert VND to points
+
+#### Idempotency Implementation
+
+```javascript
+// 1. Check for duplicate within transaction
+const existingTransaction = await Transaction.findOne({ sepay_id: payload.id }).session(session);
+if (existingTransaction) {
+  throw new DuplicateWebhookError('Transaction already processed', existingTransaction._id);
+}
+
+// 2. Reserve transaction immediately
+const reservedTransaction = new Transaction({
+  // ... transaction data
+  status: 'processing',
+  sepay_id: payload.id
+});
+await reservedTransaction.save({ session });
+
+// 3. Process content and update to completed
+await this.processWebhookContent(payload, traceId);
+```
+
+### Middleware Layer (sepay.middleware.js)
+
+#### Validation Chain
+
+```javascript
+validateWebhook() {
+  return [
+    this.validateIPWhitelist.bind(this),
+    this.validateTimestamp.bind(this),
+    this.validateApiKey.bind(this)
+  ];
+}
+```
+
+### Model Layer (Transaction.js)
+
+#### Enhanced Status Enum
+
+```javascript
+status: {
+  type: String,
+  enum: {
+    values: ['pending', 'processing', 'completed', 'failed', 'cancelled'],
+    message: 'Status must be one of: pending, processing, completed, failed, cancelled'
+  }
+}
+```
+
+## Error Handling
+
+### Custom Errors
+
+- `DuplicateWebhookError`: Thrown when duplicate `sepay_id` detected
+- Returns success response to prevent webhook retries
+
+### Response Formats
+
+#### Success Response
+```json
+{
+  "success": true,
+  "message": "Webhook processed successfully",
+  "transaction_id": "64a7b8c9d1e2f3g4h5i6j7k8"
+}
+```
+
+#### Duplicate Response
+```json
+{
+  "success": true,
+  "duplicate": true,
+  "transaction_id": "64a7b8c9d1e2f3g4h5i6j7k8"
+}
+```
+
+#### Error Response
+```json
+{
+  "success": false,
+  "error": "Error message",
+  "code": "ERR_CODE"
+}
+```
+
+## Testing
+
+### Test Scenarios
+
+1. **Idempotency Tests**
+   - Duplicate webhook with same `sepay_id`
+   - Concurrent webhook processing
+   - Transaction state verification
+
+2. **Authentication Tests**
+   - Invalid Bearer token
+   - Missing authorization header
+   - Expired timestamp
+   - IP whitelist validation
+
+3. **Integration Tests**
+   - Complete payment flow
+   - User balance updates
+   - Points conversion
+
+### Running Tests
+
+```bash
+npm test -- --grep "Payment System Tests"
+```
+
+## Monitoring and Logging
+
+### Structured Logging
+
+All webhook processing includes:
+- `traceId`: Request correlation ID
+- `sepayId`: SePay transaction ID
+- `transactionId`: Internal transaction ID
+- `processingTime`: Webhook processing duration
+
+### Key Metrics
+
+- Webhook processing time
+- Duplicate detection rate
+- Authentication failure rate
+- Transaction success rate
+
+## Migration Notes
+
+### Breaking Changes
+
+1. **Authentication Format**: Changed from `Apikey` to `Bearer` token
+2. **Webhook Secret**: No longer used for signature verification
+3. **Transaction Status**: Added `processing` status for reservation
+4. **IP Whitelist**: Now configurable via environment variable
+
+### Deployment Checklist
+
+- [ ] Update `SEPAY_IP_WHITELIST` environment variable
+- [ ] Remove `SEPAY_WEBHOOK_SECRET` references
+- [ ] Update SePay webhook configuration to use Bearer token
+- [ ] Test webhook authentication with new format
+- [ ] Monitor duplicate detection metrics
+- [ ] Verify transaction atomicity in production
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Duplicate Transactions**: Check `sepay_id` uniqueness and MongoDB indexes
+2. **Authentication Failures**: Verify Bearer token format and IP whitelist
+3. **Timestamp Errors**: Check system clock synchronization
+4. **Race Conditions**: Monitor transaction reservation logs
+
+### Debug Commands
+
+```bash
+# Check transaction by sepay_id
+db.transactions.find({ sepay_id: 12345 })
+
+# Check processing transactions
+db.transactions.find({ status: "processing" })
+
+# Check recent webhook logs
+grep "sepayId" logs/app.log | tail -20
+```
