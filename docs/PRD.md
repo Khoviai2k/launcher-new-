@@ -440,3 +440,41 @@ Các quyết định kiến trúc/phi chức năng được thống nhất bổ 
 ### Rủi ro & giảm thiểu bổ sung
 - Ngăn chặn abuse: validate app_id phía backend, áp dụng rate-limit/captcha cho endpoint công khai.
 - Tính toàn vẹn thanh toán: idempotency theo transaction_id và xác minh chữ ký mỗi webhook.
+
+---
+
+## Cập nhật (2025-09-09): Item Owned và Patch System
+
+Mục tiêu: Bổ sung 2 khả năng mới vào phạm vi tính năng nhằm tăng tính liên tục trải nghiệm giữa thiết bị và chuẩn hóa việc phân phối bản dịch/patch.
+
+### Item Owned
+- Phạm vi: Đồng bộ danh sách vật phẩm và game mà user sở hữu giữa các thiết bị (desktop client ↔ backend ↔ DB).
+- Quy ước ID:
+  - Bắt đầu bằng số: Game (ví dụ: "10").
+  - Bắt đầu bằng "a_": Avatar.
+  - Bắt đầu bằng "f_": Frame.
+- Nguồn gốc (source): vip_sub, redeem_code, points_purchase, admin_grant, giftcode, v.v.
+- Logic VIP liên quan đến source:
+  - Nếu source là vip_sub và VIP hết hạn:
+    - Với item thuộc quyền lợi VIP tạm thời: đánh dấu inactive/tạm khóa hiển thị cho tới khi VIP được gia hạn; không xóa khỏi lịch sử.
+    - Với item được tặng vĩnh viễn trong gói VIP (nếu có cấu hình): vẫn giữ trạng thái owned.
+  - Đồng bộ: Client đăng nhập → Backend trả về items từ DB → Client hợp nhất với local state (ưu tiên server) → Gửi thay đổi (nếu có) qua API sync.
+- Business value:
+  - Trải nghiệm liền mạch đa thiết bị.
+  - Giảm sai lệch dữ liệu giữa client và server.
+  - Cơ sở cho các gói đặc quyền (avatar/frame) gắn VIP.
+- User journey:
+  - Login → Lấy profile + items.
+  - Dùng điểm/tiền/VIP để mở khóa item → Items cập nhật và đồng bộ về mọi thiết bị.
+
+### Patch System
+- Phạm vi: Quản lý patch (bản dịch) cho game, tương tự Game nhưng ở cấp "patch".
+- Thuộc tính bắt buộc: id, appid (liên kết game), author, description, size, download_url (signed URL), 
+- Lưu trữ file: Cloud Storage (tạo signed URL ngắn hạn) để giảm tải backend.
+- Dòng chảy: Client yêu cầu tải patch → Backend xác thực quyền truy cập → Sinh signed URL → Client tải trực tiếp từ Cloud.
+- Business value:
+  - Giảm băng thông và tải hệ thống, tăng tốc download.
+  - Quyền truy cập rõ ràng theo VIP/điểm/giftcode.
+  - Chuẩn hóa metadata patch (author/size/description) giúp catalog hiển thị tốt hơn.
+- User journey:
+  - Xem game → Mở danh sách patch → Chọn patch → Tải & áp dụng → Trạng thái được ghi nhận (download history/telemetry).

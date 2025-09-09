@@ -454,3 +454,50 @@ Cloud Infrastructure
 - **Backup Strategy**: Automated backup cho MongoDB
 - **Disaster Recovery**: Multi-region deployment
 - **Monitoring**: Health checks và alerting system
+
+---
+
+## Cập nhật kiến trúc (2025-09-09): Item Owned Service và Patch Service
+
+### Bổ sung thành phần (Application Layer)
+- Controllers: + Item, + Patch
+- Services: + ItemService (đồng bộ/validate items), + PatchService (CRUD, signed URL)
+- External: + Cloud Storage (Signed URL): S3/Cloudflare R2/GCS (tùy triển khai)
+
+### Data Layer mở rộng
+- MongoDB Collections: users (thêm items, item_sources), patches (mới)
+- Redis: cache signed URL, cache quyền truy cập patch theo user, rate-limit tải patch
+
+### Luồng đồng bộ Item (tóm tắt)
+```
+Desktop Client → POST /auth/login
+    → JWT + user_id
+    → GET /api/v1/user/items (Bearer)
+    → Trả về: items[], item_sources{}
+    → Client hợp nhất state và (tùy chọn) POST /api/v1/user/items/sync để đẩy thay đổi
+```
+
+### Luồng tải Patch với Signed URL (tóm tắt)
+```
+Client → GET /api/v1/patches/{appid}
+    → Chọn patch {id}
+    → GET /api/v1/patches/download/{id}
+        → PatchService: kiểm tra quyền → tạo Signed URL (1h) → trả {download_url}
+    → Client tải trực tiếp từ Cloud Storage (không tải qua Backend)
+```
+
+### Sơ đồ addendum (dịch vụ mới)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       APPLICATION LAYER (Addendum)              │
+├─────────────────────────────────────────────────────────────────┤
+│  Controllers: Auth, User, Game, Payment, VIP, Admin, Download, │
+│               GiftCode, (NEW) Item, (NEW) Patch                 │
+│  Services:    Auth, User, Game, SePay, VIP, Download, Steam,   │
+│               Cache, Analytics, Notification,                  │
+│               (NEW) ItemService, (NEW) PatchService            │
+└─────────────────────────────────────────────────────────────────┘
+                          │             │
+                    MongoDB          Cloud Storage
+                   (users, patches)   (Signed URL)
+```

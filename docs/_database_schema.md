@@ -26,12 +26,10 @@ Tài liệu này mô tả chi tiết schema của MongoDB database cho hệ th�
   vip_expiry: Date,                 // VIP expiration date
   vip_package_id: ObjectId,         // Reference to VipPackages
   vip_history: [ObjectId],          // Array of purchased VIP packages
-
-  // Owned Items
-  owned_games: [String],            // Array of Steam App IDs
-  owned_avatars: [String],          // Array of Avatar IDs
-  owned_frames: [String],           // Array of Frame IDs
-  
+   
+  // owned items
+  item : [string],
+    sources: {   vip_sub, redeem_code ,points_purchase ,etc}          
   // Profile Information
   display_name: String,             // Display name
   avatar_url: String,               // Avatar image URL
@@ -63,6 +61,9 @@ db.users.createIndex({ "email": 1 }, { unique: true, sparse: true });
 db.users.createIndex({ "vip_status": 1, "vip_expiry": 1 });
 db.users.createIndex({ "status": 1, "role": 1 });
 db.users.createIndex({ "created_at": -1 });
+
+// NEW: Items queries
+db.users.createIndex({ "items": 1 });
 ```
 
 #### Constraints:
@@ -73,6 +74,11 @@ db.users.createIndex({ "created_at": -1 });
 - `vip_status`: Enum ['active', 'expired', 'never']
 - `status`: Enum ['active', 'banned', 'suspended']
 - `role`: Enum ['user', 'vip', 'admin', 'moderator']
+- NEW: `items`: Array of strings; each item ID follows rules:
+  - bắt đầu bằng số → Game (ví dụ: "10")
+  - bắt đầu bằng "a_" → Avatar
+  - bắt đầu bằng "f_" → Frame
+- NEW: `item_sources`: map item_id → source ('vip_sub', 'redeem_code', 'points_purchase', 'admin_grant', ...)
 
 ### 2. Games Collection
 
@@ -603,6 +609,41 @@ db.notifications.createIndex({ "user_id": 1, "read": 1, "created_at": -1 });
 db.notifications.createIndex({ "type": 1, "created_at": -1 });
 db.notifications.createIndex({ "expires_at": 1 }, { expireAfterSeconds: 0 });
 ```
+
+### 12. Patches Collection (NEW)
+
+**Collection Name**: `patches`
+
+#### Schema Structure:
+```javascript
+{
+  _id: ObjectId,                  // Primary key
+  appid: String,                  // Steam App ID (links to games._id)
+  author: String,                 // Patch author
+  description: String,            // Patch description
+  size: Number,                   // File size in bytes
+  download_url: String,           // Cloud storage object key or canonical URL
+
+  // Optional metadata
+  version: String,
+  created_at: Date,
+  updated_at: Date
+}
+```
+
+#### Indexes:
+```javascript
+db.patches.createIndex({ appid: 1 });
+db.patches.createIndex({ author: 1 });
+db.patches.createIndex({ updated_at: -1 });
+```
+
+#### Constraints:
+- `appid`: Required; must exist in `games`.
+- `author`: Required
+- `description`: Required
+- `size`: Required, > 0
+- `download_url`: Required (not public; used to derive signed URL)
 
 ## Additional Schema Considerations
 

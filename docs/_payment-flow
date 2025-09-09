@@ -254,6 +254,41 @@ All webhook processing includes:
 - Authentication failure rate
 - Transaction success rate
 
+## Item Purchases and Entitlements (NEW)
+
+Items can be obtained via multiple sources and must integrate with the payment system:
+
+- points_purchase: User buys points (via SePay) and spends points to unlock items
+- cash: Direct cash purchases (optional future flow)
+- vip_sub: Items granted as part of an active VIP subscription
+- redeem_code / giftcode: Items redeemed via gift codes
+
+### Flow 3: Item Purchase via Points (example)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant MongoDB
+
+    User->>Frontend: Select item and confirm purchase (points)
+    Frontend->>Backend: POST /api/v1/payments/convert-points or dedicated endpoint
+    Backend->>MongoDB: Check user.points >= price
+    alt Enough points
+        Backend->>MongoDB: Deduct points; add item to users.items and item_sources[item_id] = "points_purchase"
+        Backend-->>Frontend: { success: true, items }
+    else Not enough points
+        Backend-->>Frontend: { success: false, error: "INSUFFICIENT_POINTS" }
+    end
+```
+
+### VIP Entitlements Behavior
+- Items with source = vip_sub are active only while VIP is active.
+- On VIP expiry: mark such items inactive (do not remove history); re-activate upon VIP renewal.
+
+---
+
 ## Migration Notes
 
 ### Breaking Changes

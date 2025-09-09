@@ -69,6 +69,55 @@ HTTP Request
 
 ### 2.2 Detailed Component Dependencies
 
+#### Item Management Flow (NEW):
+```
+item.routes.js
+    │
+    ├─ auth.middleware.js (JWT)
+    │
+    ├─ item.controller.js
+    │   ├─ GET /user/items
+    │   └─ POST /user/items/sync
+    │
+    ├─ item.service.js
+    │   ├─ Merge device_items with server items
+    │   ├─ Enforce VIP expiry rules on vip_sub items
+    │   └─ Audit updates
+    │
+    ├─ User.js (Model)
+    │   └─ users.items & users.item_sources
+    │
+    └─ MongoDB → users collection; Redis (optional) for item cache
+```
+
+#### Patch Management Flow (NEW):
+```
+patch.routes.js
+    │
+    ├─ auth.middleware.js
+    │   └─ + admin.middleware.js cho upload
+    │
+    ├─ patch.controller.js
+    │   ├─ GET /patches/{appid}
+    │   ├─ GET /patches/download/{id}
+    │   └─ POST /patches/upload (admin)
+    │
+    ├─ patch.service.js
+    │   ├─ CRUD MongoDB(patches)
+    │   ├─ Access checks (VIP/points/gift)
+    │   └─ CloudStorageService → Signed URL (1h)
+    │
+    ├─ Patch.js (Model)
+    │   └─ Patch schema
+    │
+    ├─ MongoDB
+    │   └─ patches collection
+    │
+    └─ Redis
+        ├─ signed_url cache
+        └─ download rate limits
+```
+
 #### Authentication Flow:
 ```
 auth.routes.js
@@ -296,6 +345,20 @@ GitHub Integration
         └─ .lua → Steam\config\depotcache\
 ```
 
+### 3.4 Cloud Storage Dependencies (NEW)
+```
+Cloud Storage (e.g., S3/Cloudflare R2/GCS)
+    │
+    ├─ CloudStorageService
+    │   ├─ Generate Signed URL (GET only)
+    │   ├─ TTL configurable (default 1h)
+    │   └─ Object key derived from patches.download_url
+    │
+    └─ Security
+        ├─ Signed URL validation at provider
+        └─ Backend never proxies large files in production path
+```
+
 ## 4. Desktop Client Dependencies
 
 ### 4.1 Client-Server Communication
@@ -375,7 +438,8 @@ games
     ├─ Referenced by:
     │   ├─ reviews.game_id
     │   ├─ user_library.game_id
-    │   └─ translations.game_id
+    │   ├─ translations.game_id
+    │   └─ patches.appid          // NEW
     │
     └─ Primary key: _id (Steam App ID)
 
@@ -414,7 +478,8 @@ Redis Cache Structure
     │
     └─ Download Management
         ├─ download:{uuid}
-        └─ download_count:{app_id}
+        ├─ download_count:{app_id}
+        └─ patch_signed_url:{patch_id}    // NEW
 ```
 
 ## 6. Middleware Dependencies

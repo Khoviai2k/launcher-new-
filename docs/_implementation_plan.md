@@ -453,6 +453,37 @@ Day 7-8: Frontend & Client Integration
 
 **Success Metrics:**
 - Games display correctly with proper access control
+
+---
+
+## New Sprints (2025-09-09): Item & Patch
+
+### Sprint 1: Item Sync (DB + API)
+- Objectives:
+  - Thêm trường `users.items` và `users.item_sources`
+  - API: GET /user/items, POST /user/items/sync
+  - Logic VIP: items với `source=vip_sub` hết hạn → inactive (không hiển thị), giữ lịch sử
+- Deliverables:
+  - Schema cập nhật + migration script (nếu cần)
+  - Controller + Service + Tests
+
+### Sprint 2: Patch CRUD + Signed URL
+- Objectives:
+  - Tạo collection `patches`
+  - API: GET /patches/{appid}, POST /patches/upload (admin), GET /patches/download/{id}
+  - Tích hợp CloudStorageService sinh Signed URL (TTL 1h)
+- Deliverables:
+  - Model Patch + Service + Controller + Integration tests
+  - Config nhà cung cấp Cloud Storage + secrets
+
+### Sprint 3: Client Integration
+- Objectives:
+  - Desktop Client: trang/danh sách Patch theo game; tải bằng Signed URL
+  - Desktop Client: đồng bộ Items khi login; UI Avatar/Frame từ items
+  - Telemetry download patch + thông báo lỗi rõ ràng
+- Deliverables:
+  - UI/UX hoàn chỉnh, flow E2E từ login → items → patch download
+  - E2E tests cập nhật
 - Downloads work through proxy
 - Steam API responses cached properly
 - File operations are secure

@@ -641,6 +641,75 @@ Tài liệu này mô tả chi tiết tất cả các module trong hệ thống "
   - Mark as read if requested
   - Return paginated results
 
+---
+
+## 17. Item Module (ITEM)
+
+### Chức năng chính:
+- Quản lý danh sách items mà user sở hữu
+- Đồng bộ items giữa các thiết bị (server làm nguồn chân lý)
+- Validate nguồn gốc (source) và quyền truy cập theo VIP/points/giftcode
+
+### Functions:
+
+#### 17.1 Get User Items
+- **Input**: `{ user_id }`
+- **Output**: `{ items: string[], item_sources: { [item_id]: source } }`
+- **Logic**:
+  - Truy vấn MongoDB users.items và users.item_sources
+  - Trả về danh sách item và nguồn gốc
+
+#### 17.2 Sync User Items
+- **Input**: `{ user_id, device_items: string[] }`
+- **Output**: `{ merged: string[], added: string[], removed: string[] }`
+- **Logic**:
+  - Hợp nhất device_items với server items (ưu tiên server)
+  - Áp dụng rule nguồn gốc: nếu source=vip_sub và VIP hết hạn → giữ trong lịch sử nhưng inactive
+  - Ghi log audit và cập nhật DB
+
+#### 17.3 Validate Item Access
+- **Input**: `{ user_id, item_id }`
+- **Output**: `{ has_access, reason? }`
+- **Logic**:
+  - Kiểm tra source + trạng thái VIP/điểm
+  - Trả về quyền truy cập để client ẩn/hiện item
+
+## 18. Patch Module (PATCH)
+
+### Chức năng chính:
+- CRUD patch (bản dịch) theo game (appid)
+- Phát sinh Signed URL từ Cloud Storage cho download
+- Kiểm tra quyền truy cập patch theo user (VIP/points/giftcode)
+
+### Functions:
+
+#### 18.1 List Patches By App
+- **Input**: `{ appid }`
+- **Output**: `{ patches: [{ id, appid, author, description, size}] }`
+- **Logic**:
+  - Lấy danh sách từ MongoDB patches theo appid
+
+#### 18.2 Upload Patch (Admin)
+- **Input**: `{ appid, file, author, description, size}`
+- **Output**: `{ patch_id }`
+- **Logic**:
+  - Lưu metadata vào MongoDB
+  - Tải file lên Cloud Storage → lưu storage_key
+
+#### 18.3 Generate Signed Download URL
+- **Input**: `{ id, user_id }`
+- **Output**: `{ download_url, expires_at }`
+- **Logic**:
+  - Kiểm tra quyền truy cập user với patch
+  - Tạo signed URL (TTL cấu hình, ví dụ 1h)
+  - Ghi log download
+
+#### 18.4 Apply Patch (Client-facing contract)
+- **Input**: `{ appid, patch_id }`
+- **Output**: `{ success }`
+- **Logic**:
+  - Backend chỉ trả signed URL; client chịu trách nhiệm tải và áp dụng (qua FileManager/SteamService)
+
 ## Module Dependencies
 
 ```

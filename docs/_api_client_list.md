@@ -595,3 +595,50 @@ APIs with pagination use consistent format:
   }
 }
 ```
+
+---
+
+## 16. Item Module (New)
+
+### 16.1 User Items
+```
+GET /user/items
+- Headers: Authorization: Bearer {token}
+- Response: { items: string[], item_sources: { [item_id]: "vip_sub" | "redeem_code" | "points_purchase" | "admin_grant" | string } }
+- Used by: Desktop Client, Web Portal
+
+POST /user/items/sync
+- Headers: Authorization: Bearer {token}
+- Body: { device_items: string[] }
+- Response: { merged: string[], added: string[], removed: string[] }
+- Notes: Server is source of truth; items with source=vip_sub may be inactive if VIP expired.
+- Used by: Desktop Client
+```
+
+## 17. Patch Module (New)
+
+### 17.1 Patch Catalog
+```
+GET /patches/{appid}
+- Headers: Authorization: Bearer {token}
+- Response: { patches: [{ id, appid, author, description, size }] }
+- Used by: Desktop Client, Web Portal
+```
+
+### 17.2 Patch Upload (Admin)
+```
+POST /patches/upload
+- Headers: Authorization: Bearer {admin_token}
+- Body: multipart/form-data { appid, file, author, description, size }
+- Response: { patch_id }
+- Used by: Web Portal (Admin)
+```
+
+### 17.3 Generate Patch Download URL
+```
+GET /patches/download/{id}
+- Headers: Authorization: Bearer {token}
+- Response: { download_url, expires_at }
+- Notes: Signed URL generated from cloud storage. Client downloads directly from cloud.
+- Used by: Desktop Client
+```

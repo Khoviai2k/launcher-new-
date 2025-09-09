@@ -532,6 +532,44 @@ db.games.aggregate([
 
 ## 7. Scalability Considerations
 
+---
+
+## Cập nhật luồng dữ liệu (2025-09-09)
+
+### Step 9: Item Sync on Login
+```
+Client (Desktop/Web)
+    │
+    ├─ POST /api/v1/auth/login → nhận JWT + user_id
+    │
+    ├─ GET /api/v1/user/items (Bearer)
+    │   ├─ UserService → MongoDB(users)
+    │   └─ Trả về: items[], item_sources{}
+    │
+    └─ (Tùy chọn) POST /api/v1/user/items/sync
+        ├─ Gửi device_items[]
+        ├─ ItemService hợp nhất (ưu tiên server), áp rules VIP hết hạn với source=vip_sub
+        └─ Ghi audit + cập nhật users.items
+```
+
+### Step 10: Patch Download via Signed URL
+```
+Client
+    │
+    ├─ GET /api/v1/patches/{appid}
+    │   └─ PatchService → MongoDB(patches) → trả danh sách patches
+    │
+    ├─ GET /api/v1/patches/download/{id}
+    │   ├─ PatchService kiểm tra quyền (VIP/points/giftcode)
+    │   └─ CloudStorageService tạo Signed URL (TTL ~ 1h)
+    │
+    └─ Client tải trực tiếp từ Cloud Storage (không đi qua Backend)
+```
+
+### Rationale bổ sung
+- Signed URL giảm băng thông backend và tăng throughput tải file lớn (patches).
+- Item sync sau đăng nhập đảm bảo trải nghiệm đa thiết bị nhất quán, tránh drift dữ liệu do offline changes.
+
 ### 7.1 Horizontal Scaling
 - **Database Sharding**: User-based sharding strategy
 - **Load Balancing**: Multiple backend instances

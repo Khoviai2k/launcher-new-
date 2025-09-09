@@ -18,7 +18,7 @@ launcher-new-/
 ├── docs/                       # Documentation
 ├── docker-compose.yml          # Development environment
 ├── .env.example               # Environment variables template
-└── README.md                  # Project overview
+README.md                  # Project overview
 ```
 
 ```
@@ -33,10 +33,7 @@ launcher-new-/
 ├── _dependencygraph.md      # Sơ đồ phụ thuộc giữa các thành phần
 ├── _implementation_plan.md  # Kế hoạch triển khai chi tiết
 ├── _payment-flow.md          # Tài liệu bắt buộc bám sát để triển khai payment-flow.đúng chuẩn theo PRD 
-├── _fixing_plan.md          # Kế hoạch cải tiến dự án
-└── _api_update.md           # Ý tưởng cập nhật API
-
-
+└──  schema.md                # cấu trúc dữ liệu database
 
 ```
 
@@ -142,6 +139,23 @@ backend/
 - **Analytics**: Usage tracking, reporting, dashboard metrics
 - **Caching**: Redis-based caching for performance
 - **Notifications**: System notifications and alerts
+
+---
+
+### Cập nhật (2025-09-09): Thêm cấu trúc Item & Patch
+```
+backend/
+├── src/
+│   ├── controllers/
+│   │   ├── item.controller.js          # NEW: User items (list/sync)
+│   │   └── patch.controller.js         # NEW: Patch CRUD & download URL
+│   ├── services/
+│   │   ├── item.service.js             # NEW: Manage/sync/validate items
+│   │   └── patch.service.js            # NEW: CRUD, signed URL generation
+│   ├── models/
+│   │   ├── Item.js                     # NEW: Optional item metadata model
+│   │   └── Patch.js                    # NEW: Patch schema
+```
 
 ## 2. Web Portal (/web_portal/)
 

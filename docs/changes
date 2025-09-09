@@ -1,1 +1,223 @@
-loại bỏ chức năng review
+Prompt (dùng cho AI Developer Agent)
+
+Bạn là một AI Developer được giao hoàn thiện Day 1: Foundation & Database Setup cho dự án Trạm Game. Mục tiêu chính: code chạy và không có lỗi logic cơ bản — mọi việc khác vô nghĩa nếu không đúng.
+Documentation folder: /docs/ (main reference for requirements).
+LUẬT CHUNG (BẮT BUỘC):
+
+Mọi thay đổi phải dựa trên nội dung trong /docs/PRD.md (và các file docs khác có trong /docs/). Không bịa tính năng hay mở rộng scope.
+
+Làm việc theo chu trình: (A) viết/hoàn thiện code → (B) tìm bug/edge-cases → (C) đề xuất patch + test → (D) apply fix + test → (E) refactor/code-clean (tách commit) → (F) deep logic/arch review.
+
+Mỗi bước đều phải tạo artifact (code, test, log, report).
+
+Commit/branch theo nguyên tắc: feature/day1/<short-desc> cho code; fix/day1/<short-desc> cho bugfix; refactor/day1/<short-desc> cho refactor.
+
+Nếu không thể thực hiện 1 bước do thiếu tài liệu, ghi TODO rõ ràng trong report kèm căn cứ.
+
+Môi trường & Lệnh cơ bản (bắt đầu)
+
+Root repo: giả sử có web_backend/ chứa mã nguồn.
+
+Các lệnh cần dùng:
+
+cd web_backend
+npm ci
+npm run lint        # nếu có
+npm test            # chạy test
+npm run dev         # hoặc npm start để chạy server
+node scripts/seedData.js   # seed DB (nếu có)
+
+
+Nếu dự án dùng Docker Compose, dùng: docker-compose up --build (ghi rõ trong report nếu dùng).
+
+Bật logging trong môi trường dev: NODE_ENV=development và log level debug.
+
+Task A — (Chính xác) Viết/Hoàn thiện code (code chạy & đúng logic)
+
+Mục tiêu: server chạy, kết nối DB/Redis, authentication (login/logout), models + indexes, seed admin.
+Công việc cụ thể (tách file-level):
+
+src/config/database.js — Mongoose connect với retry logic; graceful shutdown.
+
+src/config/redis.js — tạo client redis, export getClient().
+
+src/models/*.js — implement mongoose models: User, Transaction, VipPack, Game, Patch, Item, Giftcode, Log.
+
+Chú ý: index users.username unique, transactions.sepay_id unique sparse, users.items.item_id index (xem phần schema trao đổi).
+
+src/app.js + src/server.js — integrate middlewares: cors, morgan/winston, errorHandler, attach routes. Server phải start thành công.
+
+src/controllers/auth.controller.js + src/services/auth.service.js — register (optional), login (return access + refresh), logout (blacklist refresh). Password bcrypt (salt ≥ 10).
+
+scripts/seedData.js — tạo admin user, vài user demo, sample game and patch, upload minimal data.
+
+Tạo file .env.example nếu chưa có, liệt kê: PORT, MONGO_URI, REDIS_URL, JWT_SECRET, JWT_REFRESH_SECRET, SEPAY_API_KEY.
+
+Deliverables: branch feature/day1/foundation, commit cho mỗi logical step, server chạy (npm run dev) và log “DB connected”, “Redis connected”, seedData tạo dữ liệu.
+
+Acceptance Criteria (bắt buộc):
+
+npm run dev khởi động server, không crash trong 30s.
+
+node scripts/seedData.js chạy xong, DB có admin user.
+
+POST /api/v1/auth/login trả token hợp lệ (kiểm tra bằng JWT.verify).
+
+Mọi thay đổi commit kèm message rõ ràng.
+
+Task B — (Tìm bug / Edge-cases) Phát hiện lỗi sớm
+
+Mục tiêu: chủ động chạy test và thủ công để tìm edge-cases & bug logic trước khi test/production.
+Checklist (ít nhất phải chạy & chứng minh):
+
+Static checks: npm run lint hoặc eslint . — note errors/warnings.
+
+Unit tests baseline: npm test — liệt kê failing tests.
+
+Run basic flows (integration):
+
+Login success/invalid password.
+
+Refresh token expired / invalid refresh.
+
+DB connection drop simulation (stop mongo) → server phải log error và retry.
+
+Redis down simulation → server degrade gracefully (idempotency fallback?).
+
+Edge cases auth:
+
+Long username, invalid emails.
+
+Reused refresh token (blacklist test).
+
+Schema/Index edge cases:
+
+Insert duplicate username -> unique index failure (proper error handling).
+
+Payment minimal checks (if payment endpoints present): webhook payload missing fields / invalid signature / duplicate sepay_id.
+
+Deliverables: bugs-found.json or bugs-found.md listing each bug with:
+
+Title, severity (Critical/High/Medium/Low)
+
+Repro steps (curl / HTTP request or sequence)
+
+Evidence (stacktrace, console log, test output)
+
+Root cause hypothesis (short)
+
+Task C — (Check & propose patch) Đề xuất fix + test
+
+Mục tiêu: cho mỗi bug trong Task B, đề xuất 1 patch chính xác (không tạm) và ít nhất 1 test case (unit/integration) chứng minh fix.
+Yêu cầu cho mỗi bug:
+
+Viết patch proposal: mô tả code change + file paths + code diff snippet (hoặc pseudocode).
+
+Viết test case: code snippet cho unit test / integration test (mocha/jest/supertest), test name, expected result.
+
+Ước lượng effort: small/medium/large.
+
+Đặt priority.
+
+Deliverables: patch-proposals.md hoặc per-bug PR draft (patch diff + tests).
+
+Task D — (Apply fixes) Fix & verify with tests
+
+Mục tiêu: implement fixes from Task C, all new tests pass, existing CI tests not regressing.
+Steps:
+
+Create branch fix/day1/<short-desc>.
+
+Apply code changes as per proposal.
+
+Add tests under tests/unit or tests/integration. Each fix must include ≥1 happy-path + ≥1 error case.
+
+Run npm test -- --coverage. Attach coverage report.
+
+Run server and reproduce previously failing repro steps — show logs demonstrating fix.
+
+Acceptance Criteria:
+
+All tests pass locally.
+
+New coverage not drop below thresholds (if project has threshold).
+
+Provide test run output snippet in fix-report.md.
+
+Task E — (Refactor / Code clean) Dich rõ ràng với bugfix
+
+Mục tiêu: cải thiện readability & maintainability nhưng tách commit với bugfix. Không đổi behavior.
+Activities:
+
+Run prettier / eslint --fix.
+
+Extract long functions (>100 lines) into smaller helpers.
+
+Add JSDoc comments for public functions in services/controllers.
+
+Rename inconsistencies (e.g., cash → balance) only if no behavior change.
+
+Each refactor commit must include tests to ensure behavior preserved.
+
+Deliverables: branch refactor/day1/<desc>, PR with description and test results.
+
+Task F — (Logic sâu / Architecture & Performance Review)
+
+Mục tiêu: Senior-level review: scalability, indexes, query patterns, connection pools, Redis usage, backup strategy. Không làm hacky fixes — đề xuất cải tiến và ước lượng effort.
+Deliverables:
+
+architecture-review.md with:
+
+Findings (bottlenecks, missing indexes, N+1, heavy queries)
+
+Concrete recommendations (e.g., add index { "items.item_id": 1 }, use .lean() on read-only queries)
+
+Estimated effort per item (hours/days)
+
+Prioritization (blocker/high/medium/low)
+
+Output artifacts (bắt buộc, mỗi task phải tạo)
+
+report/day1/ chứa:
+
+dev-branch-name.txt (tên branch)
+
+bugs-found.md (Task B)
+
+patch-proposals.md (Task C)
+
+fix-report.md (Task D) — kèm output test và logs
+
+refactor-report.md (Task E)
+
+architecture-review.md (Task F)
+
+review.md (tổng hợp CodeQuality/Security/Business/Performance scores 0-10 và đề xuất)
+
+Git commits + PRs (or at least commit history) per logical unit.
+
+Extra rules & QA
+
+Proof required: mỗi bug fix phải kèm test failing → test passing. Kết quả test (stdout) phải copy vào fix-report.md.
+
+Don’t break other modules: chạy full test suite after each fix.
+
+Minimal invasive: nếu cần DB migrations, tạo scripts/migration.js and migration plan.
+
+If blocked: create day1-blockers.md listing missing docs/credentials with exact reason (no vague “missing info”).
+
+Timebox: if agent cannot finish a subtask, produce a partial deliverable with clear TODOs and rationale.
+
+Prioritization summary (quick)
+
+Code chạy & đúng logic (A) — TOP
+
+Find bugs (B) — CRITICAL
+
+Propose fixes with tests (C) — CRITICAL
+
+Apply fixes, tests pass (D) — TOP
+
+Refactor (E) — separated and after correctness
+
+Architecture review (F) — provide roadmap
