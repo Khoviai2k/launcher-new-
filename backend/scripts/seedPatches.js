@@ -35,8 +35,7 @@ const samplePatches = [
     size: 2048000, // 2MB
     download_url: 'https://example.com/csgo-vietnamese-pack.zip',
     version: '2.1.0',
-    requires_vip: true,
-    is_free: false,
+    patch_type: 'premium',
     sort_order: 1
   },
   {
@@ -46,8 +45,7 @@ const samplePatches = [
     size: 5120000, // 5MB
     download_url: 'https://example.com/csgo-skins-collection.zip',
     version: '1.5.2',
-    requires_vip: true,
-    is_free: false,
+    patch_type: 'premium',
     sort_order: 2
   },
   {
@@ -57,9 +55,19 @@ const samplePatches = [
     size: 512000, // 512KB
     download_url: 'https://example.com/csgo-crosshair-pack.zip',
     version: '1.0.0',
-    requires_vip: false,
-    is_free: true,
+    patch_type: 'free',
     sort_order: 3
+  },
+  {
+    appid: '730',
+    author: 'Temporary Free Modder',
+    description: 'Limited Time HUD Enhancement Pack',
+    size: 1024000, // 1MB
+    download_url: 'https://example.com/csgo-hud-enhancement.zip',
+    version: '1.2.0',
+    patch_type: 'premium',
+    free_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+    sort_order: 4
   },
   
   // Dota 2 patches
@@ -70,9 +78,18 @@ const samplePatches = [
     size: 10240000, // 10MB
     download_url: 'https://example.com/dota2-vietnamese-voices.zip',
     version: '3.0.1',
-    requires_vip: false,
-    is_free: true,
+    patch_type: 'free',
     sort_order: 1
+  },
+  {
+    appid: '570',
+    author: 'Dota Premium Modder',
+    description: 'Advanced UI Enhancement Pack',
+    size: 8192000, // 8MB
+    download_url: 'https://example.com/dota2-ui-enhancement.zip',
+    version: '2.5.0',
+    patch_type: 'premium',
+    sort_order: 2
   },
   
   // GTA V patches
@@ -83,8 +100,7 @@ const samplePatches = [
     size: 15360000, // 15MB
     download_url: 'https://example.com/gta5-realistic-physics.zip',
     version: '4.2.0',
-    requires_vip: true,
-    is_free: false,
+    patch_type: 'premium',
     sort_order: 1
   },
   {
@@ -94,9 +110,18 @@ const samplePatches = [
     size: 8192000, // 8MB
     download_url: 'https://example.com/gta5-weather-mod.zip',
     version: '2.1.0',
-    requires_vip: false,
-    is_free: true,
+    patch_type: 'free',
     sort_order: 2
+  },
+  {
+    appid: '271590',
+    author: 'GTA Premium Modder',
+    description: 'Complete Graphics Overhaul',
+    size: 25600000, // 25MB
+    download_url: 'https://example.com/gta5-graphics-overhaul.zip',
+    version: '3.0.0',
+    patch_type: 'premium',
+    sort_order: 3
   }
 ];
 

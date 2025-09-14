@@ -17,8 +17,7 @@ const testPatch = {
   size: 1024000, // 1MB
   download_url: 'https://example.com/patch.zip',
   version: '1.0.0',
-  requires_vip: true,
-  is_free: false
+  patch_type: 'premium'
 };
 
 // Helper functions
