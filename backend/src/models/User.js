@@ -36,7 +36,15 @@ const userSchema = new mongoose.Schema({
     min: 0
   },
   
-  // VIP Information
+  // VIP/Membership Information
+  membership: {
+    type: String,
+    enum: ['FREE', 'VIP', 'PREMIUM'],
+    default: 'FREE'
+  },
+  membership_expiry: {
+    type: Date
+  },
   vip_status: {
     type: String,
     enum: ['active', 'expired', 'never'],
@@ -164,6 +172,17 @@ userSchema.methods.checkVipExpiry = function() {
   if (this.vip_status === 'active' && this.vip_expiry) {
     if (this.vip_expiry <= new Date()) {
       this.vip_status = 'expired';
+      return true; // Changed
+    }
+  }
+  return false; // No change
+};
+
+userSchema.methods.checkMembershipExpiry = function() {
+  if (this.membership !== 'FREE' && this.membership_expiry) {
+    if (this.membership_expiry <= new Date()) {
+      this.membership = 'FREE';
+      this.membership_expiry = null;
       return true; // Changed
     }
   }
